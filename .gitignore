@@ -1,0 +1,26 @@
+# Archivos de compilación
+compiled/
+*.zo
+
+# Backups de editores
+*~
+*.bak
+*.swp
+*.swo
+.#*
+
+# Archivos temporales
+.DS_Store
+Thumbs.db
+
+# DrRacket-specific files
+plt-prefs.rktd
+autosave/
+
+# Si usas Scribble para documentación
+*.scrbl~
+scribblings/
+
+# Archivos personales o de entorno
+.env
+*.log
