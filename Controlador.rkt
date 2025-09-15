@@ -1,4 +1,4 @@
-#lang scheme
+#lang racket
 ; =========================================================
 ; Controlador.rkt 
 ; Intermedio entre la lógica y la interfaz
