@@ -100,7 +100,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Fácil"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (set! mapa (generar_mapa fila column))
+                   (set! mapa (generar-mapa fila column 10))
                    (que_nivel 1)
                    (send canvas refresh))]
        [min-width 100]
@@ -113,7 +113,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Medio"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (generar_mapa fila column)
+                   (generar-mapa fila column 10)
                    (que_nivel 2)
                    (send canvas refresh))]
        [min-width 100]
@@ -126,7 +126,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Dificil"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (generar_mapa fila column)
+                   (generar-mapa fila column 10)
                    (que_nivel 3)
                    (send canvas refresh))]
        [min-width 100]
@@ -142,28 +142,36 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [min-height (- Walto 60)]
        [paint-callback
         (lambda (canvas dc)
-            (dibujar-tablero dc mapa))]))
+          (when (not (null? mapa))
+            (dibujar-tablero dc mapa)))]))
 
 ;dibujar el mapa
 (define (dibujar-tablero dc matriz)
   (send dc set-pen "black" 1 'solid)
   (send dc set-brush "white" 'transparent)
-  (send dc set-font (make-font #:size 16 #:family 'modern))
+  (send dc set-font (make-font #:size 20 #:family 'modern))
 
   (send dc set-background "white")
   (send dc clear)
 
-  ;dibujar líneas de la cuadrículax
-  (for ([i (in-range 10 (+ 10 (* 9 cellsize)) cellsize)])
-    (send dc draw-line i 10 i 570)   ; vertical
-    (send dc draw-line 10 i 570 i))  ; horizontal
+  (define filas (length matriz))
+  (define cols (length (first matriz)))
 
-  ;dibujar contenido de las celdas
-  (for ([fila matriz]
-        [i (in-naturals)])
-    (for ([celda fila]
-          [j (in-naturals)])
-      (let* ([contenido (cadr celda)]
-             [x (+ 25 (* j cellsize))]
-             [y (+ 25 (* i cellsize))])
-        (send dc draw-text (format "~a" contenido) x y)))))
+  (for ([i (in-range filas)])
+    (for ([j (in-range cols)])
+      (let* ([celda (list-ref (list-ref matriz i) j)]
+              [contenido (cond
+                          [(= (car celda) 1) "*"]          ; bomba
+                          [(zero? (cadr celda)) ""]        ; vacío (antes era 0)
+                          [else (number->string (cadr celda))])]
+             [x0 (* j cellsize)]
+             [y0 (* i cellsize)]
+             [w cellsize]
+             [h cellsize])
+        ;; aquí corregimos
+        (define-values (tw th descent ascent)
+          (send dc get-text-extent contenido))
+        (define tx (+ x0 (/ (- w tw) 2)))
+        (define ty (+ y0 (/ (- h th) 2)))
+        (send dc draw-rectangle x0 y0 w h)
+        (send dc draw-text contenido tx ty)))))
