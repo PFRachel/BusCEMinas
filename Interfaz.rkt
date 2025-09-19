@@ -11,8 +11,8 @@
 (define Wancho 700) ;ancho de la ventana
 (define Walto 660) ;alto de la ventana
 (define cellsize 70) ;tamaño en cada celda
-(define column 0)
-(define fila 0)
+(define column 8)
+(define fila 8)
 (define mapa '()) ; almacena la matriz actual
 
 ;============== VENTANA DE JUEGO ===========
@@ -100,7 +100,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Fácil"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (set! mapa (generar-mapa fila column 10))
+                   (set! mapa (generar_mapa fila column 10))
                    (que_nivel 1)
                    (send canvas refresh))]
        [min-width 100]
@@ -113,7 +113,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Medio"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (generar-mapa fila column 10)
+                   (set! mapa (generar_mapa fila column 10))
                    (que_nivel 2)
                    (send canvas refresh))]
        [min-width 100]
@@ -126,7 +126,7 @@ SELECCIONE EL NIVEL DE DIFICULTAD"]
        [label "Dificil"]
        [parent botones-panel]
        [callback (lambda (button event)
-                   (generar-mapa fila column 10)
+                   (set! mapa (generar_mapa fila column 10))
                    (que_nivel 3)
                    (send canvas refresh))]
        [min-width 100]
