@@ -1,177 +1,118 @@
 #lang racket
 ; =========================================================
-; Interfaz.rkt 
-; Interfaz de usuario
+; Interfaz.rkt
+; Interfaz de usuario del Buscaminas
 ; =========================================================
-; ============= ARCHIVOS IMPORTADOS =======================
 (require "Controlador.rkt")
-(require racket/gui) ;biblioteca para interfaz
+(require racket/gui)
 
-;============== VARIABLES ===================
-(define Wancho 700) ;ancho de la ventana
-(define Walto 660) ;alto de la ventana
-(define cellsize 70) ;tamaño en cada celda
-(define column 8)
+(define Wancho 700)
+(define Walto 700)
+(define cellsize 60)
 (define fila 8)
-(define mapa '()) ; almacena la matriz actual
+(define column 8)
+(define mapa '())
+(define bomb-image (read-bitmap "C:/Users/Rachel/Desktop/BusCEMinas/bomba.png"))
+(define label-bombas #f)
+(define total-bombas 0)
 
-;============== VENTANA DE JUEGO ===========
-(define frame (new frame%
-                   [label "busCEMinas"]
-                   [width Wancho]
-                   [height Walto]
-                   [alignment '(center center)]))
-(send frame show #t) ;mostrar interfaz
+; ========================================
+; Dibujar tablero
+; ========================================
+(define (dibujar-tablero dc matriz)
+  (define filas (length matriz))
+  (define cols (length (first matriz)))
+  (for ([i (in-range filas)])
+    (for ([j (in-range cols)])
+      (let* ([celda (list-ref (list-ref matriz i) j)]
+             [x0 (* j cellsize)]
+             [y0 (* i cellsize)])
+        ;; dibujar celda
+        (send dc set-pen "black" 1 'solid)
+        (send dc set-brush "white" 'solid)
+        (send dc draw-rectangle x0 y0 cellsize cellsize)
 
-;============== VENTANA DE MENU ===========
-(define Menuframe (new frame%
-                       [label "MENU-BUSCEMINAS"]
-                       [width 889]
-                       [height 550]
-                       [alignment '(center center)]))
-(send Menuframe show #t) ;mostrar interfaz
+        ;; dibujar contenido
+        (cond
+          [(= (car celda) 1) ; bomba
+           (define w (/ cellsize 2))
+           (define h (/ cellsize 2))
+           (define x (+ x0 (/ (- cellsize w) 2)))
+           (define y (+ y0 (/ (- cellsize h) 2)))
+           (send dc draw-bitmap bomb-image x y)] ; bitmap original, no escalamos
+          [(positive? (cadr celda))
+           (define txt (number->string (cadr celda)))
+           (define-values (tw th descent ascent)
+             (send dc get-text-extent txt))
+           (define tx (+ x0 (/ (- cellsize tw) 2)))
+           (define ty (+ y0 (/ (- cellsize th) 2)))
+           (send dc draw-text txt tx ty)])))))
 
-;panel para ordenar todos los elementos en la ventana
-(define menu-panel
-  (new group-box-panel% [label ""]
-       [parent Menuframe]
-       [min-width 300]
-       [min-height 300]))
+; ========================================
+; Ventanas
+; ========================================
+(define frame (new frame% [label "Buscaminas"] [width Wancho] [height Walto]))
+(define Menuframe (new frame% [label "MENU - BUSCAMINAS"] [width 400] [height 300]))
 
-;labels
-(define titulo
-  (new message%
-       [parent menu-panel]       
-       [label "
-BUSCEMINAS"]
-       [font (make-font #:size 20)])) 
+; Panel de menu
+(define menu-panel (new vertical-panel% [parent Menuframe]))
 
-(define instruc1
-  (new message%
-       [parent menu-panel]  
-       [label "INSERTE TAMAÑO DEL TABLERO
-"]
-       [min-width 300]   
-       [min-height 100]
-       [font (make-font #:size 14)]))
+(new message% [parent menu-panel] [label "\nBUSCAMINAS"] [font (make-font #:size 20 #:weight 'bold)])
+(new message% [parent menu-panel] [label "Seleccione tamaño y dificultad"] [font (make-font #:size 12)])
 
-;choice para filas
+; Choice para filas y columnas
 (define menu-filas
   (new choice%
-       [label "Filas: "]
        [parent menu-panel]
-       [choices '("8" "9" "10" "11" "12" "13" "14" "15")]
-       [callback (lambda (choice event)
-                   (define idx (send choice get-selection))
-                   (define str (send choice get-string idx))
-                   (set! fila (string->number str)))]
-       [font (make-font #:size 15)]))
+       [label "Filas: "]
+       [choices '("8" "9" "10" "12" "15")]
+       [callback (lambda (c e) (set! fila (string->number (send c get-string (send c get-selection)))))]))
 
-;choice para columnas
 (define menu-columnas
   (new choice%
+       [parent menu-panel]
        [label "Columnas: "]
-       [choices '("8" "9" "10" "11" "12" "13" "14" "15")]
-       [callback (lambda (choice event)
-                   (define idx (send choice get-selection))
-                   (define str (send choice get-string idx))
-                   (set! column (string->number str)))]
-       [parent menu-panel]
-       [font (make-font #:size 15)]))
+       [choices '("8" "9" "10" "12" "15")]
+       [callback (lambda (c e) (set! column (string->number (send c get-string (send c get-selection)))))]))
 
-;label
-(define level
-  (new message%
-       [parent menu-panel]    
-       [label "
-SELECCIONE EL NIVEL DE DIFICULTAD"]
-       [min-width 400]   
-       [min-height 100] 
-       [font (make-font #:size 14)]))
+; Panel de dificultad
+(new message% [parent menu-panel] [label "\nDificultad"] [font (make-font #:size 12 #:weight 'bold)])
+(define botones-panel (new horizontal-panel% [parent menu-panel]))
 
-;botones
-(define botones-panel
-  (new horizontal-panel%
-       [parent menu-panel]
-       [alignment '(center center)]))
+; Iniciar juego
+(define (iniciar-juego nivel)
+  (set! total-bombas (que_nivel nivel))
+  (set! mapa (generar_mapa fila column total-bombas))
+  (send label-bombas set-label (format "Bombas: ~a" total-bombas))
+  (send Menuframe show #f)
+  (send frame show #t)
+  (send canvas refresh))
 
-(define btn-facil
-  (new button%
-       [label "Fácil"]
-       [parent botones-panel]
-       [callback (lambda (button event)
-                   (set! mapa (generar_mapa fila column 10))
-                   (que_nivel 1)
-                   (send canvas refresh))]
-       [min-width 100]
-       [min-height 50]
-       [horiz-margin 10]
-       [font (make-font #:size 15)]))
+(new button% [parent botones-panel] [label "Fácil"] [callback (lambda (b e) (iniciar-juego 1))])
+(new button% [parent botones-panel] [label "Medio"] [callback (lambda (b e) (iniciar-juego 2))])
+(new button% [parent botones-panel] [label "Difícil"] [callback (lambda (b e) (iniciar-juego 3))])
 
-(define btn-medio
-  (new button%
-       [label "Medio"]
-       [parent botones-panel]
-       [callback (lambda (button event)
-                   (set! mapa (generar_mapa fila column 10))
-                   (que_nivel 2)
-                   (send canvas refresh))]
-       [min-width 100]
-       [min-height 50]
-       [horiz-margin 10]
-       [font (make-font #:size 15)]))
+; Panel superior del juego
+(define top-panel (new horizontal-panel% [parent frame] [min-height 40]))
+(set! label-bombas (new message% [parent top-panel] [label "Bombas: 0"] [font (make-font #:size 14 #:weight 'bold)]))
+(new button% [parent top-panel] [label "Reiniciar"] [callback (lambda (b e)
+                                                               (send frame show #f)
+                                                               (send Menuframe show #t))])
 
-(define btn-dificil
-  (new button%
-       [label "Dificil"]
-       [parent botones-panel]
-       [callback (lambda (button event)
-                   (set! mapa (generar_mapa fila column 10))
-                   (que_nivel 3)
-                   (send canvas refresh))]
-       [min-width 100]
-       [min-height 50]
-       [horiz-margin 10]
-       [font (make-font #:size 15)]))
-
-;canva(espacio) para dibujar el mapa
+; Canvas del tablero
 (define canvas
   (new canvas%
        [parent frame]
        [min-width Wancho]
        [min-height (- Walto 60)]
        [paint-callback
-        (lambda (canvas dc)
+        (lambda (c dc)
+          ;; fondo gris
+          (send dc set-brush "lightgray" 'solid)
+          (send dc draw-rectangle 0 0 Wancho (- Walto 60))
+          ;; dibujar tablero
           (when (not (null? mapa))
             (dibujar-tablero dc mapa)))]))
 
-;dibujar el mapa
-(define (dibujar-tablero dc matriz)
-  (send dc set-pen "black" 1 'solid)
-  (send dc set-brush "white" 'transparent)
-  (send dc set-font (make-font #:size 20 #:family 'modern))
-
-  (send dc set-background "white")
-  (send dc clear)
-
-  (define filas (length matriz))
-  (define cols (length (first matriz)))
-
-  (for ([i (in-range filas)])
-    (for ([j (in-range cols)])
-      (let* ([celda (list-ref (list-ref matriz i) j)]
-              [contenido (cond
-                          [(= (car celda) 1) "*"]          ; bomba
-                          [(zero? (cadr celda)) ""]        ; vacío (antes era 0)
-                          [else (number->string (cadr celda))])]
-             [x0 (* j cellsize)]
-             [y0 (* i cellsize)]
-             [w cellsize]
-             [h cellsize])
-        ;; aquí corregimos
-        (define-values (tw th descent ascent)
-          (send dc get-text-extent contenido))
-        (define tx (+ x0 (/ (- w tw) 2)))
-        (define ty (+ y0 (/ (- h th) 2)))
-        (send dc draw-rectangle x0 y0 w h)
-        (send dc draw-text contenido tx ty)))))
+(send Menuframe show #t)
+(send frame show #f)
