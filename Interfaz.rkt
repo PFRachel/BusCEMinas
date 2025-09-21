@@ -8,12 +8,11 @@
 
 (define Wancho 700)
 (define Walto 700)
-(define cellsize 65)
+(define cellsize 44)
 (define fila 8)
 (define column 8)
 (define mapa '())
 (define celdas-reveladas '()) ; matriz para controlar qué celdas están reveladas
-(define bomb-image (read-bitmap "C:/Users/Rachel/Desktop/BusCEMinas/bomba.png"))
 (define label-bombas #f)
 (define total-bombas 0)
 (define canvas #f)
@@ -116,11 +115,11 @@
 (new message% [parent menu-panel] [label ""])
 (define size-panel (new horizontal-panel% [parent menu-panel] [alignment '(center center)]))
 (define menu-filas
-  (new choice% [parent size-panel] [label "Filas: "] [choices '("8" "9" "10" "12" "15")]
+  (new choice% [parent size-panel] [label "Filas: "] [choices '("8" "9" "10" "11" "12" "13" "14" "15")]
        [font (make-font #:size 14 #:weight 'bold)]
        [callback (lambda (c e) (set! fila (string->number (send c get-string (send c get-selection)))))]))
 (define menu-columnas
-  (new choice% [parent size-panel] [label "Columnas: "] [choices '("8" "9" "10" "12" "15")]
+  (new choice% [parent size-panel] [label "Columnas: "] [choices '("8" "9" "10" "11" "12" "13" "14" "15")]
        [font (make-font #:size 14 #:weight 'bold)]
        [callback (lambda (c e) (set! column (string->number (send c get-string (send c get-selection)))))]))
 (new message% [parent menu-panel] [label ""])
@@ -134,9 +133,16 @@
   (set! mapa (generar_mapa fila column total-bombas))
   (set! celdas-reveladas (inicializar-reveladas fila column))
   (send label-bombas set-label (format "Bombas: ~a" total-bombas))
+; Ajustar tamaño de ventana y canvas dinámicamente
+  (define new-width (* column cellsize))
+  (define new-height (+ 60 (* fila cellsize))) 
+  (send frame resize new-width new-height)
+  (send canvas min-width new-width)
+  (send canvas min-height (* fila cellsize))
   (send Menuframe show #f)
   (send frame show #t)
   (send canvas refresh))
+
 
 (new button% [parent botones-panel] [label "Fácil"] [min-width 100]
      [font (make-font #:size 12 #:weight 'bold)] [callback (lambda (b e) (iniciar-juego 1))])
@@ -147,7 +153,7 @@
 
 ; Panel superior del juego
 (define top-panel (new horizontal-panel% [parent frame] [min-height 40]))
-(set! label-bombas (new message% [parent top-panel] [label "Bombas: 0"] [font (make-font #:size 14 #:weight 'bold)]))
+(set! label-bombas (new message% [parent top-panel] [label "Bombas: 0   "] [font (make-font #:size 14 #:weight 'bold)]))
 (new button% [parent top-panel] [label "Reiniciar"] [callback (lambda (b e)
                                                                (send frame show #f)
                                                                (send Menuframe show #t))])
