@@ -248,7 +248,8 @@
 ; Panel superior del juego
 (define top-panel (new horizontal-panel% [parent frame] [min-height 40]))
 (set! label-bombas (new message% [parent top-panel] [label "Bombas: 0   |   🚩: 0"]
-                        [font (make-font #:size 14 #:weight 'bold)]))
+                        [font (make-font #:size 14 #:weight 'bold)]
+                        [min-width 250]))
 (new button% [parent top-panel] [label "Reiniciar"]
      [callback (lambda (b e)
                  (set! mapa '())
