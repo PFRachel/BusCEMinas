@@ -69,28 +69,29 @@
         (if revelada?
             ;; Celda revelada
             (cond
-               [(= (car celda) 1) ; bomba
+              [(= (car celda) 1) ; bomba
                (define txt "💣") ; icono de bomba
                (send dc set-font (make-font #:size (round (* 0.6 cellsize)) #:weight 'bold))
+               (send dc set-text-foreground "black") ; bomba negra
                (define-values (tw th descent ascent)
                  (send dc get-text-extent txt))
                (define tx (+ x0 (/ (- cellsize tw) 2)))
                (define ty (+ y0 (/ (- cellsize th) 2)))
                (send dc draw-text txt tx ty)]
-              [(positive? (cadr celda)) ; número de bombas alrededor
-               (define txt (number->string (cadr celda)))
-               (send dc set-font (make-font #:size 24 #:weight 'bold))
+              [else ; mostrar número, incluso 0
+               (define num (cadr celda))
+               (define txt (number->string num))
+               (send dc set-font (make-font #:size (round (* 0.5 cellsize)) #:weight 'bold))
                (define-values (tw th descent ascent)
                  (send dc get-text-extent txt))
                (define tx (+ x0 (/ (- cellsize tw) 2)))
                (define ty (+ y0 (/ (- cellsize th) 2)))
                (send dc set-text-foreground
-                     (case (cadr celda)
-                       [(1) "blue"] [(2) "green"] [(3) "red"]
+                     (case num
+                       [(0) "black"] [(1) "blue"] [(2) "green"] [(3) "red"]
                        [(4) "purple"] [(5) "maroon"] [(6) "turquoise"]
                        [(7) "black"] [(8) "gray"] [else "black"]))
-               (send dc draw-text txt tx ty)]
-              [else #f])
+               (send dc draw-text txt tx ty)])
             ;; Celda no revelada: efecto 3D
             (begin
               (send dc set-pen "white" 2 'solid)
