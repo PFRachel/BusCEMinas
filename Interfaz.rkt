@@ -85,6 +85,46 @@
     (or es-bomba rev?)))
 
 ; ========================================
+; Flood fill (revelado en cascada para celdas con 0)
+; ========================================
+(define (marcar-revelada! r c)
+  (set! celdas-reveladas
+        (for/list ([i (in-range (length celdas-reveladas))])
+          (for/list ([j (in-range (length (first celdas-reveladas)))])
+            (if (and (= i r) (= j c))
+                #t
+                (list-ref (list-ref celdas-reveladas i) j))))))
+
+(define (revelar-cascada fila-idx col-idx)
+  (define filas (length mapa))
+  (define cols  (length (first mapa)))
+  (define pendientes (list (list fila-idx col-idx))) ; cola LIFO simple
+  (let loop ()
+    (when (not (null? pendientes))
+      (define actual (car pendientes))
+      (set! pendientes (cdr pendientes))
+      (define r (car actual))
+      (define c (cadr actual))
+      (when (and (>= r 0) (< r filas) (>= c 0) (< c cols))
+        (unless (or (celda-revelada? r c)
+                    (list-ref (list-ref celdas-flags r) c)) ; no abrir si hay bandera
+          (marcar-revelada! r c)
+          (define celda (list-ref (list-ref mapa r) c))
+          (when (and (= 0 (car celda)) (= 0 (cadr celda))) ; celda segura con número 0
+            (define vecinos
+              (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
+                    (list r (- c 1))                       (list r (+ c 1))
+                    (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1))))
+            (for ([p vecinos])
+              (define vr (car p))
+              (define vc (cadr p))
+              (when (and (>= vr 0) (< vr filas) (>= vc 0) (< vc cols)
+                         (not (celda-revelada? vr vc)))
+                (set! pendientes (cons (list vr vc) pendientes)))))))
+      (loop)))
+  (void))
+
+; ========================================
 ; Dibujar tablero
 ; ========================================
 (define (dibujar-tablero dc matriz)
@@ -247,7 +287,7 @@
                              (list-ref (list-ref celdas-flags i) j))))))
              (actualizar-indicadores!)
              (send canvas refresh)]
-            [else ; left-down → revelar
+            [else ; left-down → revelar (con flood fill si es 0)
              (unless (list-ref (list-ref celdas-flags row-idx) col-idx)
                (define celda (list-ref (list-ref mapa row-idx) col-idx))
                (cond
@@ -257,7 +297,9 @@
                   (send canvas refresh)
                   (message-box "Fin del juego" "¡Boom! Pisaste una bomba.")]
                  [else
-                  (revelar-celda row-idx col-idx)
+                  (if (= 0 (cadr celda))
+                      (revelar-cascada row-idx col-idx) ; ← FLOOD FILL
+                      (revelar-celda row-idx col-idx))
                   (send canvas refresh)
                   (when (victoria?)
                     (set! juego-terminado? #t)
