@@ -5,6 +5,7 @@
 ; =========================================================
 (require "Controlador.rkt")
 (require racket/gui)
+(require (prefix-in mp: "Mapa.rkt"))
 
 (define Wancho 700)
 (define Walto 700)
@@ -20,109 +21,11 @@
 (define canvas #f)
 
 ; ========================================
-; Inicializar matriz de celdas reveladas
-; ========================================
-(define (inicializar-reveladas filas cols)
-  (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)])
-      #f)))
-
-(define (inicializar-flags filas cols)
-  (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)]) #f)))
-
-; ========================================
 ; Contador de banderas y actualización de label
 ; ========================================
-(define (contar-banderas)
-  (for/sum ([fila celdas-flags])
-    (for/sum ([v fila]) (if v 1 0))))
-
 (define (actualizar-indicadores!)
-  (define k (contar-banderas))
+  (define k (mp:contar-banderas celdas-flags))
   (send label-bombas set-label (format "Bombas: ~a   |   🚩: ~a" total-bombas k)))
-
-; ========================================
-; Revelar / consultar estado
-; ========================================
-(define (revelar-celda fila-idx col-idx)
-  (when (and (< fila-idx (length celdas-reveladas))
-             (< col-idx (length (first celdas-reveladas))))
-    (set! celdas-reveladas
-          (for/list ([i (in-range (length celdas-reveladas))])
-            (for/list ([j (in-range (length (first celdas-reveladas)))])
-              (if (and (= i fila-idx) (= j col-idx))
-                  #t
-                  (list-ref (list-ref celdas-reveladas i) j))))))
-  (when canvas (send canvas refresh)))
-
-; ========================================
-; Verificar si una celda está revelada
-; ========================================
-(define (celda-revelada? fila-idx col-idx)
-  (and (< fila-idx (length celdas-reveladas))
-       (< col-idx (length (first celdas-reveladas)))
-       (list-ref (list-ref celdas-reveladas fila-idx) col-idx)))
-
-; ========================================
-; Game Over / Victoria
-; ========================================
-(define (revelar-todas-las-bombas!)
-  (define filas (length mapa))
-  (define cols  (length (first mapa)))
-  (for* ([i (in-range filas)] [j (in-range cols)])
-    (when (= 1 (car (list-ref (list-ref mapa i) j)))
-      (revelar-celda i j))))
-
-;; Ganas si todas las NO-bomba están reveladas
-(define (victoria?)
-  (define filas (length mapa))
-  (define cols  (length (first mapa)))
-  (for*/and ([i (in-range filas)] [j (in-range cols)])
-    (define celda (list-ref (list-ref mapa i) j))
-    (define es-bomba (= 1 (car celda)))
-    (define rev? (celda-revelada? i j))
-    (or es-bomba rev?)))
-
-; ========================================
-; Flood fill (revelado en cascada para celdas con 0)
-; ========================================
-(define (marcar-revelada! r c)
-  (set! celdas-reveladas
-        (for/list ([i (in-range (length celdas-reveladas))])
-          (for/list ([j (in-range (length (first celdas-reveladas)))])
-            (if (and (= i r) (= j c))
-                #t
-                (list-ref (list-ref celdas-reveladas i) j))))))
-
-(define (revelar-cascada fila-idx col-idx)
-  (define filas (length mapa))
-  (define cols  (length (first mapa)))
-  (define pendientes (list (list fila-idx col-idx))) ; cola LIFO simple
-  (let loop ()
-    (when (not (null? pendientes))
-      (define actual (car pendientes))
-      (set! pendientes (cdr pendientes))
-      (define r (car actual))
-      (define c (cadr actual))
-      (when (and (>= r 0) (< r filas) (>= c 0) (< c cols))
-        (unless (or (celda-revelada? r c)
-                    (list-ref (list-ref celdas-flags r) c)) ; no abrir si hay bandera
-          (marcar-revelada! r c)
-          (define celda (list-ref (list-ref mapa r) c))
-          (when (and (= 0 (car celda)) (= 0 (cadr celda))) ; celda segura con número 0
-            (define vecinos
-              (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
-                    (list r (- c 1))                       (list r (+ c 1))
-                    (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1))))
-            (for ([p vecinos])
-              (define vr (car p))
-              (define vc (cadr p))
-              (when (and (>= vr 0) (< vr filas) (>= vc 0) (< vc cols)
-                         (not (celda-revelada? vr vc)))
-                (set! pendientes (cons (list vr vc) pendientes)))))))
-      (loop)))
-  (void))
 
 ; ========================================
 ; Dibujar tablero
@@ -135,7 +38,7 @@
       (let* ([celda (list-ref (list-ref matriz i) j)]
              [x0 (* j cellsize)]
              [y0 (* i cellsize)]
-             [revelada? (celda-revelada? i j)])
+             [revelada? (mp:celda-revelada? celdas-reveladas i j)])
         
         ;; fondo y borde
         (send dc set-brush (if revelada? "white" "lightgray") 'solid)
@@ -224,8 +127,8 @@
 (define (iniciar-juego nivel)
   (set! total-bombas (que_nivel nivel))
   (set! mapa (generar_mapa fila column total-bombas))
-  (set! celdas-reveladas (inicializar-reveladas fila column))
-  (set! celdas-flags (inicializar-flags fila column))
+  (set! celdas-reveladas (mp:inicializar-reveladas fila column))
+  (set! celdas-flags     (mp:inicializar-flags     fila column))
   (set! juego-terminado? #f)
   (actualizar-indicadores!)
   ; ajustar tamaño dinámico
@@ -279,13 +182,14 @@
                    (< col-idx (length (first mapa))))
           (cond
             [(eq? tipo 'right-down) ; alternar bandera
-             (unless (celda-revelada? row-idx col-idx)
+             (unless (mp:celda-revelada? celdas-reveladas row-idx col-idx)
                (set! celdas-flags
                      (for/list ([i (in-range (length celdas-flags))])
-                       (for/list ([j (in-range (length (first celdas-flags)))])
+                       (for/list ([j (in-range (length (first celdas-flags)))]
+                                  )
                          (if (and (= i row-idx) (= j col-idx))
                              (not (list-ref (list-ref celdas-flags i) j))
-                             (list-ref (list-ref celdas-flags i) j))))))
+                             (list-ref (list-ref celdas-flags i) j))))))             
              (actualizar-indicadores!)
              (send canvas refresh)]
             [else ; left-down → revelar (con flood fill si es 0)
@@ -294,15 +198,17 @@
                (cond
                  [(= 1 (car celda))
                   (set! juego-terminado? #t)
-                  (revelar-todas-las-bombas!)
+                  (set! celdas-reveladas (mp:revelar-todas-las-bombas mapa celdas-reveladas))
                   (send canvas refresh)
                   (message-box "Fin del juego" "¡Boom! Pisaste una bomba.")]
                  [else
                   (if (= 0 (cadr celda))
-                      (revelar-cascada row-idx col-idx) ; ← FLOOD FILL
-                      (revelar-celda row-idx col-idx))
+                      (set! celdas-reveladas
+                            (mp:revelar-cascada mapa celdas-reveladas celdas-flags row-idx col-idx))
+                      (set! celdas-reveladas
+                            (mp:revelar-celda celdas-reveladas row-idx col-idx)))
                   (send canvas refresh)
-                  (when (victoria?)
+                  (when (mp:victoria? mapa celdas-reveladas)
                     (set! juego-terminado? #t)
                     (message-box "¡Ganaste!" "Has despejado todas las celdas. 🎉"))]))])))
       (super on-event event))

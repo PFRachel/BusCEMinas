@@ -19,9 +19,18 @@
 
 
 ; =============== FUNCIONES EXPORTADAS ====================
-(provide mapping)
-(provide level)
-(provide generar-mapa)
+(provide inicializar-reveladas
+         inicializar-flags
+         contar-banderas
+         celda-revelada?
+         marcar-revelada
+         revelar-celda
+         revelar-cascada
+         victoria?
+         revelar-todas-las-bombas
+         generar-mapa
+         level
+         mapping)
 (require racket/list)
 
 ; crear una matriz que contiene una tupla
@@ -107,3 +116,88 @@
          [(zero? (cadr celda)) "0"]                ; sin bombas alrededor → vacío
          [else (format "~a " (cadr celda))])))      ; 1–8 bombas alrededor
     (newline)))
+
+;; Matrices booleanas (reveladas / flags)
+(define (inicializar-reveladas filas cols)
+  (for/list ([i (in-range filas)])
+    (for/list ([j (in-range cols)]) #f))) ; Al inicio ninguna celda esta revelada
+
+(define (inicializar-flags filas cols)
+  (for/list ([i (in-range filas)])
+    (for/list ([j (in-range cols)]) #f))); Al inicio no hay banderas colocadas por player
+
+(define (contar-banderas flags)
+  (for/sum ([fila flags])
+    (for/sum ([v fila]) (if v 1 0)))) ; Cuantas banderas hay en el tablero
+
+;; Lectura/escritura en matriz booleana
+(define (celda-revelada? reveladas r c)
+  (and (< r (length reveladas))
+       (< c (length (first reveladas)))
+       (list-ref (list-ref reveladas r) c))) ; Consulta el estdo de revelado
+
+(define (marcar-revelada reveladas r c) ; Devuelve matriz de reveladas con las celdas marcadas
+  (for/list ([i (in-range (length reveladas))])
+    (for/list ([j (in-range (length (first reveladas)))])
+      (if (and (= i r) (= j c))
+          #t
+          (list-ref (list-ref reveladas i) j)))))
+
+;; Revelar UNA celda 
+(define (revelar-celda reveladas r c)
+  (marcar-revelada reveladas r c))
+
+;; Flood fill (revelado en cascada para celdas con número 0)
+(define (revelar-cascada mapa reveladas flags r0 c0)
+  (define filas (length mapa))
+  (define cols  (length (first mapa)))
+  (let loop ([pend (list (list r0 c0))]
+             [R reveladas]) ; R es la matriz de reveladas
+    (cond
+      [(null? pend) R]
+      [else
+       (define r (caar pend))
+       (define c (cadar pend))
+       (define rest (cdr pend))
+       (cond
+         [(not (en-rango? r c filas cols))
+          (loop rest R)]
+         [(or (celda-revelada? R r c)
+              (list-ref (list-ref flags r) c)) ; no abrir si hay bandera
+          (loop rest R)] ; Si ya esta rvelada o hay bandera se la salta
+         [else
+          (define R1 (marcar-revelada R r c))
+          (define celda (list-ref (list-ref mapa r) c))
+          (define es-bomba (= 1 (car celda)))
+          (define num (cadr celda))
+          (if (and (not es-bomba) (= num 0)) ; Si es 0 se sigue expandiendo
+              (let ([vecinos
+                     (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
+                           (list r (- c 1))                       (list r (+ c 1))
+                           (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1)))])
+                (loop (append vecinos rest) R1)) ; Si no es 0 solo se abre una celda
+              (loop rest R1))])])))
+
+;; Victoria: todas las NO-bomba están reveladas
+(define (victoria? mapa reveladas)
+  (define filas (length mapa))
+  (define cols  (length (first mapa)))
+  (for*/and ([i (in-range filas)] [j (in-range cols)])
+    (define celda (list-ref (list-ref mapa i) j))
+    (define es-bomba (= 1 (car celda)))
+    (define rev? (celda-revelada? reveladas i j))
+    (or es-bomba rev?)))
+
+;; Revelar todas las bombas (para game over)
+(define (revelar-todas-las-bombas mapa reveladas)
+  (define filas (length mapa))
+  (define cols  (length (first mapa)))
+  ; Recolectar coordenadas de bombas
+  (define bombas
+    (for*/list ([i (in-range filas)]
+                [j (in-range cols)]
+                #:when (= 1 (car (list-ref (list-ref mapa i) j))))
+      (list i j)))
+  ; Marcar todas como reveladas
+  (for/fold ([R reveladas]) ([p bombas])
+    (marcar-revelada R (first p) (second p))))
