@@ -92,13 +92,13 @@
 ; ========================================
 ; Ventanas y menú
 ; ========================================
-(define frame (new frame% [label "Buscaminas"] [width Wancho] [height Walto]))
-(define Menuframe (new frame% [label "MENU - BUSCAMINAS"] [width 450] [height 350]))
+(define frame (new frame% [label "BusCEMinas"] [width Wancho] [height Walto]))
+(define Menuframe (new frame% [label "MENU - BusCEMinas"] [width 450] [height 350]))
 
 ; Paneles y botones del menú
 (define menu-panel (new vertical-panel% [parent Menuframe] [alignment '(center center)]))
 (define titulo-panel (new horizontal-panel% [parent menu-panel] [alignment '(center center)]))
-(new message% [parent titulo-panel] [label "BUSCAMINAS"] [font (make-font #:size 28 #:weight 'bold)])
+(new message% [parent titulo-panel] [label "BusCEMinas"] [font (make-font #:size 28 #:weight 'bold)])
 (define subtitulo-panel (new horizontal-panel% [parent menu-panel] [alignment '(center center)]))
 (new message% [parent subtitulo-panel] [label "Seleccione tamaño y dificultad"] [font (make-font #:size 14)])
 (new message% [parent menu-panel] [label ""])
