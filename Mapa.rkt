@@ -42,7 +42,7 @@
 
 ;toma n(nivel de dificultad)y realiza las validaciones
 (define (level n)
-  (cond [(equal? n 1) (+ 1 (random 10))]  ; fácil: 10 minas
+  (cond [(equal? n 1) (+ 5 (random 10))]  ; fácil: 10 minas
     [(equal? n 2) (+ 10 (random 20))]  ; medio: 20 minas
     [(equal? n 3) (+ 20 (random 30))]  ; difícil: 30 minas
     [else 0]))
