@@ -15,10 +15,9 @@
 ; 5. generar-mapa: integra todo → devuelve un tablero con bombas (*) y números (1–8).
 ;
 ; Nota: las celdas con 0 bombas alrededor se muestran como vacías (no como "0").
-;Ademas esta logica fue implementada requirio de ayuda de ChatGPT para calcular los numeros del tablero.
 
+(require racket/list)
 
-; =============== FUNCIONES EXPORTADAS ====================
 (provide inicializar-reveladas
          inicializar-flags
          contar-banderas
@@ -31,121 +30,102 @@
          generar-mapa
          level
          mapping)
-(require racket/list)
 
-; crear una matriz que contiene una tupla
-; (es bomba(1/0) y cant bombas alrededor)
-(define (mapping i j ) ;toma parámetros de tamaño del mapa
-  (build-list i ;longitud de filas
+;; ================= MAPA VACÍO =================
+(define (mapping i j)
+  (build-list i
     (lambda (_)
-      (build-list j (lambda (_) (list 0 0)))))) ;[MODIFICAR] llenar cada celda con los elementos
+      (build-list j (lambda (_) (list 0 0))))))
 
-;toma n(nivel de dificultad)y realiza las validaciones
+;; ================= DIFICULTAD =================
 (define (level n)
-  (cond [(equal? n 1) (+ 1 (random 10))]  ; fácil: 10 minas
-    [(equal? n 2) (+ 10 (random 20))]  ; medio: 20 minas
-    [(equal? n 3) (+ 20 (random 30))]  ; difícil: 30 minas
-    [else 0]))
-;; Verificar si coordenada está en rango
+  (cond [(equal? n 1) (+ 1 (random 10))]
+        [(equal? n 2) (+ 10 (random 20))]
+        [(equal? n 3) (+ 20 (random 30))]
+        [else 0]))
+
+;; ================= UTILIDADES =================
 (define (en-rango? r c filas cols)
   (and (>= r 0) (< r filas)
        (>= c 0) (< c cols)))
 
-;; Contar bombas en vecinos (3x3 alrededor)
 (define (contar-bombas-alrededor tablero r c)
-  (define filas (length tablero))
-  (define cols (length (first tablero)))
-  (for*/sum ([dr '(-1 0 1)]     ; usar for*/sum en vez de for/sum
+  (for*/sum ([dr '(-1 0 1)]
              [dc '(-1 0 1)]
-             #:when (not (and (= dr 0) (= dc 0)))) ; excluir la celda misma
-    (let ([nr (+ r dr)]
-          [nc (+ c dc)])
-      (if (and (en-rango? nr nc filas cols)
-               (= 1 (car (list-ref (list-ref tablero nr) nc))))
-          1
-          0))))
+             #:when (not (and (= dr 0) (= dc 0))))
+    (if (and (en-rango? (+ r dr) (+ c dc) (length tablero) (length (first tablero)))
+             (= 1 (car (list-ref (list-ref tablero (+ r dr)) (+ c dc)))))
+        1
+        0)))
 
-;; Colocar bombas en posiciones aleatorias
+;; ================= COLOCAR BOMBAS =================
 (define (colocar-bombas tablero num-bombas)
-  (define filas (length tablero))
-  (define cols (length (first tablero)))
-  (define coords
-    (for*/list ([r (in-range filas)]
-                [c (in-range cols)])
-      (list r c)))
-  (define minas (take (shuffle coords) num-bombas))
-  (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)])
-      (if (member (list i j) minas)
-          (list 1 0) ; bomba
+  (for/list ([i (in-range (length tablero))])
+    (for/list ([j (in-range (length (first tablero)))])
+      (if (member (list i j)
+                  (take (shuffle
+                         (for*/list ([r (in-range (length tablero))]
+                                     [c (in-range (length (first tablero)))])
+                           (list r c)))
+                        num-bombas))
+          (list 1 0)
           (list 0 0)))))
 
-;; Calcular números del tablero
-(define (calcular-numeros tablero)
-  (define filas (length tablero))
-  (define cols (length (first tablero)))
-  (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)])
-      (let ([celda (list-ref (list-ref tablero i) j)])
-        (if (= (car celda) 1) ; es bomba
-            celda
-            (list 0 (contar-bombas-alrededor tablero i j)))))))
 
-;; Generar tablero completo con bombas y números
+;; ================= NÚMEROS =================
+(define (calcular-numeros tablero)
+  (for/list ([i (in-range (length tablero))])
+    (for/list ([j (in-range (length (first tablero)))])
+      (if (= (car (list-ref (list-ref tablero i) j)) 1)
+          (list 1 0)
+          (list 0 (contar-bombas-alrededor tablero i j))))))
+
+;; ================= MAPA COMPLETO =================
 (define (generar-mapa filas cols num-bombas)
-  (define tablero-con-bombas (colocar-bombas (mapping filas cols) num-bombas))
   (define tablero-final
-    (for/list ([i (in-range filas)])
-      (for/list ([j (in-range cols)])
-        (let ([celda (list-ref (list-ref tablero-con-bombas i) j)])
-          (if (= (car celda) 1) ; si es bomba, la dejamos igual
-              celda
-              (list 0 (contar-bombas-alrededor tablero-con-bombas i j)))))))
-  ;; imprimir en consola el tablero
+    (calcular-numeros (colocar-bombas (mapping filas cols) num-bombas)))
   (imprimir-mapa tablero-final)
   tablero-final)
 
-;; Imprimir el tablero en consola
 (define (imprimir-mapa tablero)
   (for ([fila tablero])
     (for ([celda fila])
       (display
-       (cond
-         [(= (car celda) 1) "* "]                   ; bomba
-         [(zero? (cadr celda)) "0"]                ; sin bombas alrededor → vacío
-         [else (format "~a " (cadr celda))])))      ; 1–8 bombas alrededor
+       (cond [(= (car celda) 1) "* "]
+             [(zero? (cadr celda)) "0"]
+             [else (format "~a " (cadr celda))])))
     (newline)))
 
-;; Matrices booleanas (reveladas / flags)
+;; ================= MATRICES BOOLEANAS =================
 (define (inicializar-reveladas filas cols)
   (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)]) #f))) ; Al inicio ninguna celda esta revelada
+    (for/list ([j (in-range cols)]) #f)))
 
 (define (inicializar-flags filas cols)
   (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)]) #f))); Al inicio no hay banderas colocadas por player
+    (for/list ([j (in-range cols)]) #f)))
 
 (define (contar-banderas flags)
   (for/sum ([fila flags])
-    (for/sum ([v fila]) (if v 1 0)))) ; Cuantas banderas hay en el tablero
+    (for/sum ([v fila]) (if v 1 0))))
 
-;; Lectura/escritura en matriz booleana
 (define (celda-revelada? reveladas r c)
   (and (< r (length reveladas))
        (< c (length (first reveladas)))
-       (list-ref (list-ref reveladas r) c))) ; Consulta el estdo de revelado
+       (list-ref (list-ref reveladas r) c)))
 
-(define (marcar-revelada reveladas r c) ; Devuelve matriz de reveladas con las celdas marcadas
+(define (marcar-revelada reveladas r c)
   (for/list ([i (in-range (length reveladas))])
     (for/list ([j (in-range (length (first reveladas)))])
       (if (and (= i r) (= j c))
           #t
           (list-ref (list-ref reveladas i) j)))))
 
-;; Revelar UNA celda 
 (define (revelar-celda reveladas r c)
   (marcar-revelada reveladas r c))
 
+
+;; =============== FLood fill ===============
 ;; Flood fill (revelado en cascada para celdas con número 0)
 (define (revelar-cascada mapa reveladas flags r0 c0)
   (define filas (length mapa))
@@ -163,7 +143,7 @@
           (loop rest R)]
          [(or (celda-revelada? R r c)
               (list-ref (list-ref flags r) c)) ; no abrir si hay bandera
-          (loop rest R)] ; Si ya esta rvelada o hay bandera se la salta
+          (loop rest R)] ; Si ya esta revelada o hay bandera se la salta
          [else
           (define R1 (marcar-revelada R r c))
           (define celda (list-ref (list-ref mapa r) c))
