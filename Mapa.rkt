@@ -86,15 +86,16 @@
           (list 0 (contar-bombas-alrededor tablero i j))))))
 
 ;; Generar tablero completo con bombas y números
-
 (define (generar-mapa filas cols num-bombas)
-  (define tablero-con-bombas (colocar-bombas (mapping filas cols) num-bombas))
+  (define tablero-con-bombas
+    (colocar-bombas (mapping filas cols) num-bombas))
   (define tablero-final
     (for/list ([i (in-range filas)])
       (for/list ([j (in-range cols)])
         (if (= (car (list-ref (list-ref tablero-con-bombas i) j)) 1) ; si es bomba
             (list-ref (list-ref tablero-con-bombas i) j)             ; la dejamos igual
             (list 0 (contar-bombas-alrededor tablero-con-bombas i j)))))) ; si no, calculamos número
+
   ;; imprimir en consola el tablero
   (imprimir-mapa tablero-final)
   tablero-final)
