@@ -42,7 +42,7 @@
 
 ;toma n(nivel de dificultad)y realiza las validaciones
 (define (level n)
-  (cond [(equal? n 1) (+ 1 (random 10))]  ; fácil: 10 minas
+  (cond [(equal? n 1) (+ 5 (random 10))]  ; fácil: 10 minas
     [(equal? n 2) (+ 10 (random 20))]  ; medio: 20 minas
     [(equal? n 3) (+ 20 (random 30))]  ; difícil: 30 minas
     [else 0]))
@@ -53,17 +53,14 @@
 
 ;; Contar bombas en vecinos (3x3 alrededor)
 (define (contar-bombas-alrededor tablero r c)
-  (define filas (length tablero))
-  (define cols (length (first tablero)))
-  (for*/sum ([dr '(-1 0 1)]     ; usar for*/sum en vez de for/sum
+  (for*/sum ([dr '(-1 0 1)]
              [dc '(-1 0 1)]
-             #:when (not (and (= dr 0) (= dc 0)))) ; excluir la celda misma
-    (let ([nr (+ r dr)]
-          [nc (+ c dc)])
-      (if (and (en-rango? nr nc filas cols)
-               (= 1 (car (list-ref (list-ref tablero nr) nc))))
-          1
-          0))))
+             #:when (not (and (= dr 0) (= dc 0))))
+    (if (and (en-rango? (+ r dr) (+ c dc) (length tablero) (length (first tablero)))
+             (= 1 (car (list-ref (list-ref tablero (+ r dr)) (+ c dc)))))
+        1
+        0)))
+
 
 ;; Colocar bombas en posiciones aleatorias
 (define (colocar-bombas tablero num-bombas)
@@ -82,29 +79,26 @@
 
 ;; Calcular números del tablero
 (define (calcular-numeros tablero)
-  (define filas (length tablero))
-  (define cols (length (first tablero)))
-  (for/list ([i (in-range filas)])
-    (for/list ([j (in-range cols)])
-      (let ([celda (list-ref (list-ref tablero i) j)])
-        (if (= (car celda) 1) ; es bomba
-            celda
-            (list 0 (contar-bombas-alrededor tablero i j)))))))
+  (for/list ([i (in-range (length tablero))])
+    (for/list ([j (in-range (length (first tablero)))])
+      (if (= (car (list-ref (list-ref tablero i) j)) 1)
+          (list-ref (list-ref tablero i) j)
+          (list 0 (contar-bombas-alrededor tablero i j))))))
 
 ;; Generar tablero completo con bombas y números
 (define (generar-mapa filas cols num-bombas)
-  (define tablero-con-bombas (colocar-bombas (mapping filas cols) num-bombas))
+  (define tablero-con-bombas
+    (colocar-bombas (mapping filas cols) num-bombas))
   (define tablero-final
     (for/list ([i (in-range filas)])
       (for/list ([j (in-range cols)])
-        (let ([celda (list-ref (list-ref tablero-con-bombas i) j)])
-          (if (= (car celda) 1) ; si es bomba, la dejamos igual
-              celda
-              (list 0 (contar-bombas-alrededor tablero-con-bombas i j)))))))
+        (if (= (car (list-ref (list-ref tablero-con-bombas i) j)) 1) ; si es bomba
+            (list-ref (list-ref tablero-con-bombas i) j)             ; la dejamos igual
+            (list 0 (contar-bombas-alrededor tablero-con-bombas i j)))))) ; si no, calculamos número
+
   ;; imprimir en consola el tablero
   (imprimir-mapa tablero-final)
   tablero-final)
-
 ;; Imprimir el tablero en consola
 (define (imprimir-mapa tablero)
   (for ([fila tablero])
@@ -146,36 +140,41 @@
 (define (revelar-celda reveladas r c)
   (marcar-revelada reveladas r c))
 
-;; Flood fill (revelado en cascada para celdas con número 0)
+; Flood fill (revelado en cascada para celdas con 0)
 (define (revelar-cascada mapa reveladas flags r0 c0)
   (define filas (length mapa))
   (define cols  (length (first mapa)))
-  (let loop ([pend (list (list r0 c0))]
-             [R reveladas]) ; R es la matriz de reveladas
+
+  ; si esta revelado o marcado se ignora
+  (define (step r c rest R)
     (cond
-      [(null? pend) R]
+      [(not (en-rango? r c filas cols))
+       (loop rest R)]
+      [(or (celda-revelada? R r c)
+           (list-ref (list-ref flags r) c))
+       (loop rest R)]
       [else
-       (define r (caar pend))
-       (define c (cadar pend))
-       (define rest (cdr pend))
-       (cond
-         [(not (en-rango? r c filas cols))
-          (loop rest R)]
-         [(or (celda-revelada? R r c)
-              (list-ref (list-ref flags r) c)) ; no abrir si hay bandera
-          (loop rest R)] ; Si ya esta rvelada o hay bandera se la salta
-         [else
-          (define R1 (marcar-revelada R r c))
-          (define celda (list-ref (list-ref mapa r) c))
-          (define es-bomba (= 1 (car celda)))
-          (define num (cadr celda))
-          (if (and (not es-bomba) (= num 0)) ; Si es 0 se sigue expandiendo
-              (let ([vecinos
-                     (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
-                           (list r (- c 1))                       (list r (+ c 1))
-                           (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1)))])
-                (loop (append vecinos rest) R1)) ; Si no es 0 solo se abre una celda
-              (loop rest R1))])])))
+       (define R1 (marcar-revelada R r c)) ; marca la celda como revelada
+       (define celda (list-ref (list-ref mapa r) c))
+       (define es-bomba (= 1 (car celda)))
+       (define num (cadr celda))
+       (if (and (not es-bomba) (= num 0)) ; si no es bomba y el numero es 0 hay expansión
+           (loop (append
+                  (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
+                        (list r (- c 1))                       (list r (+ c 1))
+                        (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1)))
+                  rest)
+                 R1)
+           (loop rest R1))]))
+
+  ;; Bucle de procesamiento (pila de pendientes)
+  (define (loop pend R)
+    (if (null? pend)
+        R
+        (step (caar pend) (cadar pend) (cdr pend) R)))
+
+  (loop (list (list r0 c0)) reveladas))
+
 
 ;; Victoria: todas las NO-bomba están reveladas
 (define (victoria? mapa reveladas)
