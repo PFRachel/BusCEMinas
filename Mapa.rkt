@@ -140,36 +140,41 @@
 (define (revelar-celda reveladas r c)
   (marcar-revelada reveladas r c))
 
-;; Flood fill (revelado en cascada para celdas con número 0)
+; Flood fill (revelado en cascada para celdas con 0)
 (define (revelar-cascada mapa reveladas flags r0 c0)
   (define filas (length mapa))
   (define cols  (length (first mapa)))
-  (let loop ([pend (list (list r0 c0))]
-             [R reveladas]) ; R es la matriz de reveladas
+
+  ; si esta revelado o marcado se ignora
+  (define (step r c rest R)
     (cond
-      [(null? pend) R]
+      [(not (en-rango? r c filas cols))
+       (loop rest R)]
+      [(or (celda-revelada? R r c)
+           (list-ref (list-ref flags r) c))
+       (loop rest R)]
       [else
-       (define r (caar pend))
-       (define c (cadar pend))
-       (define rest (cdr pend))
-       (cond
-         [(not (en-rango? r c filas cols))
-          (loop rest R)]
-         [(or (celda-revelada? R r c)
-              (list-ref (list-ref flags r) c)) ; no abrir si hay bandera
-          (loop rest R)] ; Si ya esta rvelada o hay bandera se la salta
-         [else
-          (define R1 (marcar-revelada R r c))
-          (define celda (list-ref (list-ref mapa r) c))
-          (define es-bomba (= 1 (car celda)))
-          (define num (cadr celda))
-          (if (and (not es-bomba) (= num 0)) ; Si es 0 se sigue expandiendo
-              (let ([vecinos
-                     (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
-                           (list r (- c 1))                       (list r (+ c 1))
-                           (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1)))])
-                (loop (append vecinos rest) R1)) ; Si no es 0 solo se abre una celda
-              (loop rest R1))])])))
+       (define R1 (marcar-revelada R r c)) ; marca la celda como revelada
+       (define celda (list-ref (list-ref mapa r) c))
+       (define es-bomba (= 1 (car celda)))
+       (define num (cadr celda))
+       (if (and (not es-bomba) (= num 0)) ; si no es bomba y el numero es 0 hay expansión
+           (loop (append
+                  (list (list (- r 1) (- c 1)) (list (- r 1) c) (list (- r 1) (+ c 1))
+                        (list r (- c 1))                       (list r (+ c 1))
+                        (list (+ r 1) (- c 1)) (list (+ r 1) c) (list (+ r 1) (+ c 1)))
+                  rest)
+                 R1)
+           (loop rest R1))]))
+
+  ;; Bucle de procesamiento (pila de pendientes)
+  (define (loop pend R)
+    (if (null? pend)
+        R
+        (step (caar pend) (cadar pend) (cdr pend) R)))
+
+  (loop (list (list r0 c0)) reveladas))
+
 
 ;; Victoria: todas las NO-bomba están reveladas
 (define (victoria? mapa reveladas)
